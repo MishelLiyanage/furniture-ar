@@ -385,42 +385,6 @@
             border-color: #2e86de;
         }
 
-        /* "Place in Room" coming-soon overlay */
-        #coming-soon {
-            position: fixed;
-            inset: 0;
-            z-index: 3000;
-            background: rgba(0, 0, 0, 0.85);
-            display: none;
-            align-items: center;
-            justify-content: center;
-            flex-direction: column;
-            gap: 16px;
-            text-align: center;
-            padding: 32px;
-        }
-
-        #coming-soon.active {
-            display: flex;
-        }
-
-        #coming-soon p {
-            color: #a0b4c8;
-            font-size: 15px;
-            max-width: 300px;
-            margin: 0;
-        }
-
-        #coming-soon button {
-            padding: 12px 28px;
-            border: none;
-            border-radius: 10px;
-            background: #2e86de;
-            color: #fff;
-            font-size: 15px;
-            font-weight: 600;
-            cursor: pointer;
-        }
     </style>
 </head>
 
@@ -444,19 +408,11 @@
             <span class="btn-icon">🏠</span>
             <span class="btn-text">
                 <strong>Place in My Room</strong>
-                <small>Coming soon — markerless mode</small>
+                <small>Markerless — scan any surface</small>
             </span>
         </button>
 
         <div class="landing-footer">Furniture AR Viewer · v1.0</div>
-    </div>
-
-    <!-- ══ COMING SOON SHEET ══ -->
-    <div id="coming-soon">
-        <div style="font-size:48px">🏗️</div>
-        <h2 style="color:#fff;margin:0;font-size:22px">Coming Soon</h2>
-        <p>Markerless room placement is in development. Use Scan Catalog mode for now.</p>
-        <button id="coming-soon-close">Back to Home</button>
     </div>
 
     <!-- ══ A-FRAME SCENE — always in DOM so WebGL initialises at page load ══ -->
@@ -559,11 +515,7 @@
             });
 
             document.getElementById("place-room-btn").addEventListener("click", function () {
-                document.getElementById("coming-soon").classList.add("active");
-            });
-
-            document.getElementById("coming-soon-close").addEventListener("click", function () {
-                document.getElementById("coming-soon").classList.remove("active");
+                window.location.href = "markerless.html";
             });
 
             document.getElementById("back-btn").addEventListener("click", function () {
