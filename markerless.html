@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no">
+    <title>Furniture AR — Markerless</title>
+    <script type="module" src="https://unpkg.com/@google/model-viewer/dist/model-viewer.min.js"></script>
+    <style>
+        *,
+        *::before,
+        *::after {
+            box-sizing: border-box;
+        }
+
+        html,
+        body {
+            margin: 0;
+            padding: 0;
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            font-family: 'Segoe UI', system-ui, sans-serif;
+            background: #0f0f0f;
+        }
+
+        #viewer {
+            width: 100%;
+            height: 100%;
+            --poster-color: #0f0f0f;
+        }
+
+        #back-btn {
+            position: fixed;
+            top: 14px;
+            left: 14px;
+            z-index: 999;
+            background: rgba(0, 0, 0, 0.6);
+            border: none;
+            border-radius: 50%;
+            width: 36px;
+            height: 36px;
+            color: #fff;
+            font-size: 18px;
+            cursor: pointer;
+        }
+
+        #model-picker {
+            position: fixed;
+            top: 14px;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 999;
+            display: flex;
+            gap: 8px;
+        }
+
+        #model-picker button {
+            font-size: 13px;
+            padding: 8px 14px;
+            border: 1.5px solid rgba(255, 255, 255, 0.25);
+            border-radius: 20px;
+            background: rgba(0, 0, 0, 0.55);
+            color: #fff;
+            cursor: pointer;
+            white-space: nowrap;
+        }
+
+        #model-picker button.active {
+            background: #2e86de;
+            border-color: #2e86de;
+        }
+
+        #ar-button {
+            position: fixed;
+            bottom: 24px;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 999;
+            padding: 14px 28px;
+            border: none;
+            border-radius: 24px;
+            background: #2e86de;
+            color: #fff;
+            font-size: 15px;
+            font-weight: 600;
+            cursor: pointer;
+            box-shadow: 0 6px 24px rgba(46, 134, 222, 0.45);
+        }
+
+        #ar-unsupported {
+            position: fixed;
+            bottom: 24px;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 999;
+            color: #fff;
+            background: rgba(0, 0, 0, 0.6);
+            padding: 10px 18px;
+            border-radius: 20px;
+            font-size: 13px;
+            display: none;
+            max-width: 80vw;
+            text-align: center;
+        }
+    </style>
+</head>
+
+<body>
+
+    <button id="back-btn" title="Back">&#8592;</button>
+    <div id="model-picker"></div>
+
+    <model-viewer id="viewer" ar ar-modes="scene-viewer webxr quick-look" ar-scale="fixed" camera-controls
+        shadow-intensity="1" src="assets/models/chair_1.glb">
+        <button slot="ar-button" id="ar-button">View in your room</button>
+    </model-viewer>
+
+    <div id="ar-unsupported">AR isn't available on this device/browser — you can still rotate and preview the model
+        above.</div>
+
+    <script>
+        var MODELS = [
+            { key: "chair_1", label: "Chair 1", assetPath: "assets/models/chair_1.glb" },
+            { key: "rocking_chair", label: "Rocking Chair", assetPath: "assets/models/rocking_chair.glb" },
+            { key: "chair_small", label: "Chair (Small)", assetPath: "assets/models/chair_small.glb" },
+            { key: "adjustable_desk", label: "Adj. Desk", assetPath: "assets/models/adjustable_desk.glb" },
+            { key: "coffee_table", label: "Coffee Table", assetPath: "assets/models/coffee_table.glb" },
+            { key: "folding_table", label: "Folding Table", assetPath: "assets/models/folding_table.glb" }
+        ];
+
+        document.addEventListener("DOMContentLoaded", function () {
+            var viewer = document.getElementById("viewer");
+            var picker = document.getElementById("model-picker");
+            var unsupported = document.getElementById("ar-unsupported");
+
+            MODELS.forEach(function (model, index) {
+                var btn = document.createElement("button");
+                btn.type = "button";
+                btn.textContent = model.label;
+                btn.addEventListener("click", function () {
+                    viewer.setAttribute("src", model.assetPath);
+                    Array.prototype.forEach.call(picker.children, function (b) {
+                        b.classList.remove("active");
+                    });
+                    btn.classList.add("active");
+                });
+                picker.appendChild(btn);
+                if (index === 0) btn.classList.add("active");
+            });
+
+            viewer.addEventListener("ar-status", function (event) {
+                if (event.detail.status === "not-presenting" && !viewer.canActivateAR) {
+                    unsupported.style.display = "block";
+                }
+            });
+
+            setTimeout(function () {
+                if (!viewer.canActivateAR) {
+                    unsupported.style.display = "block";
+                }
+            }, 1500);
+
+            document.getElementById("back-btn").addEventListener("click", function () {
+                window.location.href = "index.html";
+            });
+        });
+    </script>
+</body>
+
+</html>
