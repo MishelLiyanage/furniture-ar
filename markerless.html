@@ -6,6 +6,14 @@
     <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no">
     <title>Furniture AR — Markerless</title>
     <script type="module" src="https://unpkg.com/@google/model-viewer/dist/model-viewer.min.js"></script>
+    <script type="importmap">
+        {
+            "imports": {
+                "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+                "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+            }
+        }
+    </script>
     <style>
         *,
         *::before,
@@ -28,6 +36,31 @@
             width: 100%;
             height: 100%;
             --poster-color: #0f0f0f;
+        }
+
+        #ar-canvas {
+            position: fixed;
+            inset: 0;
+            width: 100%;
+            height: 100%;
+            display: none;
+            background: transparent;
+        }
+
+        body.ar-active #ar-canvas {
+            display: block;
+        }
+
+        body.ar-active #viewer {
+            display: none;
+        }
+
+        body.ar-active #start-ar-btn {
+            display: none;
+        }
+
+        body.ar-active #ar-hint {
+            display: block;
         }
 
         #back-btn {
@@ -71,7 +104,23 @@
             border-color: #2e86de;
         }
 
-        #ar-button {
+        #ar-hint {
+            position: fixed;
+            top: 64px;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 999;
+            display: none;
+            color: #fff;
+            background: rgba(0, 0, 0, 0.55);
+            padding: 8px 16px;
+            border-radius: 16px;
+            font-size: 13px;
+            text-align: center;
+            max-width: 85vw;
+        }
+
+        #start-ar-btn {
             position: fixed;
             bottom: 24px;
             left: 50%;
@@ -86,6 +135,11 @@
             font-weight: 600;
             cursor: pointer;
             box-shadow: 0 6px 24px rgba(46, 134, 222, 0.45);
+        }
+
+        #start-ar-btn:disabled {
+            opacity: 0.5;
+            cursor: default;
         }
 
         #ar-unsupported {
@@ -110,16 +164,20 @@
 
     <button id="back-btn" title="Back">&#8592;</button>
     <div id="model-picker"></div>
+    <div id="ar-hint">Move your phone to find a surface, then tap to place</div>
 
-    <model-viewer id="viewer" ar ar-modes="scene-viewer webxr quick-look" ar-scale="fixed" camera-controls
-        shadow-intensity="1" src="assets/models/chair_1.glb">
-        <button slot="ar-button" id="ar-button">View in your room</button>
-    </model-viewer>
+    <model-viewer id="viewer" camera-controls shadow-intensity="1" src="assets/models/chair_1.glb"></model-viewer>
 
+    <button id="start-ar-btn" type="button">View in your room</button>
     <div id="ar-unsupported">AR isn't available on this device/browser — you can still rotate and preview the model
         above.</div>
 
-    <script>
+    <canvas id="ar-canvas"></canvas>
+
+    <script type="module">
+        import * as THREE from 'three';
+        import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+
         var MODELS = [
             { key: "chair_1", label: "Chair 1", assetPath: "assets/models/chair_1.glb" },
             { key: "rocking_chair", label: "Rocking Chair", assetPath: "assets/models/rocking_chair.glb" },
@@ -129,42 +187,198 @@
             { key: "folding_table", label: "Folding Table", assetPath: "assets/models/folding_table.glb" }
         ];
 
-        document.addEventListener("DOMContentLoaded", function () {
-            var viewer = document.getElementById("viewer");
-            var picker = document.getElementById("model-picker");
-            var unsupported = document.getElementById("ar-unsupported");
+        var viewer = document.getElementById("viewer");
+        var picker = document.getElementById("model-picker");
+        var unsupported = document.getElementById("ar-unsupported");
+        var startArBtn = document.getElementById("start-ar-btn");
+        var arHint = document.getElementById("ar-hint");
+        var arCanvas = document.getElementById("ar-canvas");
+        var backBtn = document.getElementById("back-btn");
 
-            MODELS.forEach(function (model, index) {
-                var btn = document.createElement("button");
-                btn.type = "button";
-                btn.textContent = model.label;
-                btn.addEventListener("click", function () {
-                    viewer.setAttribute("src", model.assetPath);
-                    Array.prototype.forEach.call(picker.children, function (b) {
-                        b.classList.remove("active");
-                    });
-                    btn.classList.add("active");
+        var currentModel = MODELS[0];
+
+        MODELS.forEach(function (model, index) {
+            var btn = document.createElement("button");
+            btn.type = "button";
+            btn.textContent = model.label;
+            btn.addEventListener("click", function () {
+                currentModel = model;
+                viewer.setAttribute("src", model.assetPath);
+                Array.prototype.forEach.call(picker.children, function (b) {
+                    b.classList.remove("active");
                 });
-                picker.appendChild(btn);
-                if (index === 0) btn.classList.add("active");
+                btn.classList.add("active");
+                loadModelInto(model.assetPath);
             });
-
-            viewer.addEventListener("ar-status", function (event) {
-                if (event.detail.status === "not-presenting" && !viewer.canActivateAR) {
-                    unsupported.style.display = "block";
-                }
-            });
-
-            setTimeout(function () {
-                if (!viewer.canActivateAR) {
-                    unsupported.style.display = "block";
-                }
-            }, 1500);
-
-            document.getElementById("back-btn").addEventListener("click", function () {
-                window.location.href = "index.html";
-            });
+            picker.appendChild(btn);
+            if (index === 0) btn.classList.add("active");
         });
+
+        backBtn.addEventListener("click", function () {
+            if (xrSession) {
+                xrSession.end();
+            } else {
+                window.location.href = "index.html";
+            }
+        });
+
+        // ── Three.js WebXR hit-test AR setup ──────────────────────────
+        var renderer = null;
+        var scene = null;
+        var camera = null;
+        var reticle = null;
+        var modelGroup = null;
+        var gltfLoader = new GLTFLoader();
+        var xrSession = null;
+        var hitTestSource = null;
+        var hitTestSourceRequested = false;
+        var placed = false;
+
+        function initThree() {
+            renderer = new THREE.WebGLRenderer({ canvas: arCanvas, alpha: true, antialias: true });
+            renderer.setPixelRatio(window.devicePixelRatio);
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            renderer.setClearColor(0x000000, 0);
+            renderer.xr.enabled = true;
+
+            scene = new THREE.Scene();
+            camera = new THREE.PerspectiveCamera(70, window.innerWidth / window.innerHeight, 0.01, 20);
+
+            var hemiLight = new THREE.HemisphereLight(0xffffff, 0x444466, 0.9);
+            scene.add(hemiLight);
+            var dirLight1 = new THREE.DirectionalLight(0xffffff, 1.0);
+            dirLight1.position.set(1, 2, 1);
+            scene.add(dirLight1);
+            var dirLight2 = new THREE.DirectionalLight(0xffffff, 0.4);
+            dirLight2.position.set(-1, 0.5, -1);
+            scene.add(dirLight2);
+
+            reticle = new THREE.Mesh(
+                new THREE.RingGeometry(0.08, 0.1, 32).rotateX(-Math.PI / 2),
+                new THREE.MeshBasicMaterial({ color: 0x2e86de })
+            );
+            reticle.matrixAutoUpdate = false;
+            reticle.visible = false;
+            scene.add(reticle);
+
+            modelGroup = new THREE.Group();
+            modelGroup.visible = false;
+            scene.add(modelGroup);
+
+            window.addEventListener("resize", function () {
+                if (!renderer) return;
+                camera.aspect = window.innerWidth / window.innerHeight;
+                camera.updateProjectionMatrix();
+                renderer.setSize(window.innerWidth, window.innerHeight);
+            });
+        }
+
+        function loadModelInto(assetPath) {
+            gltfLoader.load(assetPath, function (gltf) {
+                while (modelGroup.children.length) {
+                    modelGroup.remove(modelGroup.children[0]);
+                }
+                modelGroup.add(gltf.scene);
+            }, undefined, function (err) {
+                console.error("Failed to load model", assetPath, err);
+            });
+        }
+
+        function onSelect() {
+            if (!reticle.visible) return;
+            reticle.matrix.decompose(modelGroup.position, modelGroup.quaternion, modelGroup.scale);
+            modelGroup.scale.set(1, 1, 1);
+            modelGroup.visible = true;
+            if (!placed) {
+                placed = true;
+                arHint.textContent = "Tap elsewhere to move it";
+            }
+        }
+
+        function onXRFrame(timestamp, frame) {
+            var session = frame.session;
+            var referenceSpace = renderer.xr.getReferenceSpace();
+
+            if (!hitTestSourceRequested) {
+                hitTestSourceRequested = true;
+                session.requestReferenceSpace("viewer").then(function (viewerSpace) {
+                    session.requestHitTestSource({ space: viewerSpace }).then(function (source) {
+                        hitTestSource = source;
+                    });
+                });
+                session.addEventListener("end", function () {
+                    hitTestSourceRequested = false;
+                    hitTestSource = null;
+                });
+            }
+
+            if (hitTestSource) {
+                var hitTestResults = frame.getHitTestResults(hitTestSource);
+                if (hitTestResults.length) {
+                    var hit = hitTestResults[0];
+                    var pose = hit.getPose(referenceSpace);
+                    reticle.visible = true;
+                    reticle.matrix.fromArray(pose.transform.matrix);
+                } else {
+                    reticle.visible = false;
+                }
+            }
+
+            renderer.render(scene, camera);
+        }
+
+        async function startAR() {
+            if (!renderer) initThree();
+
+            placed = false;
+            modelGroup.visible = false;
+            reticle.visible = false;
+            arHint.textContent = "Move your phone to find a surface, then tap to place";
+            loadModelInto(currentModel.assetPath);
+
+            try {
+                xrSession = await navigator.xr.requestSession("immersive-ar", {
+                    requiredFeatures: ["hit-test"],
+                    optionalFeatures: ["dom-overlay", "local-floor"],
+                    domOverlay: { root: document.body }
+                });
+            } catch (err) {
+                console.error("Failed to start AR session", err);
+                unsupported.style.display = "block";
+                return;
+            }
+
+            document.body.classList.add("ar-active");
+            await renderer.xr.setSession(xrSession);
+
+            xrSession.addEventListener("select", onSelect);
+            xrSession.addEventListener("end", function () {
+                document.body.classList.remove("ar-active");
+                xrSession = null;
+                renderer.setAnimationLoop(null);
+            });
+
+            renderer.setAnimationLoop(onXRFrame);
+        }
+
+        startArBtn.addEventListener("click", function () {
+            startAR();
+        });
+
+        if (navigator.xr && navigator.xr.isSessionSupported) {
+            navigator.xr.isSessionSupported("immersive-ar").then(function (supported) {
+                if (!supported) {
+                    startArBtn.disabled = true;
+                    unsupported.style.display = "block";
+                }
+            }).catch(function () {
+                startArBtn.disabled = true;
+                unsupported.style.display = "block";
+            });
+        } else {
+            startArBtn.disabled = true;
+            unsupported.style.display = "block";
+        }
     </script>
 </body>
 
