@@ -95,7 +95,8 @@
         }
 
         #back-btn,
-        #reset-btn {
+        #reset-btn,
+        #mute-btn {
             flex: 0 0 auto;
             width: 38px;
             height: 38px;
@@ -115,13 +116,27 @@
         }
 
         #back-btn:active,
-        #reset-btn:active {
+        #reset-btn:active,
+        #mute-btn:active {
             transform: scale(0.92);
             background: rgba(20, 20, 20, 0.85);
         }
 
         #reset-btn {
             display: none;
+        }
+
+        #mute-btn {
+            display: none;
+            font-size: 15px;
+        }
+
+        body.ar-active #mute-btn {
+            display: flex;
+        }
+
+        #mute-btn.muted {
+            background: rgba(220, 60, 60, 0.55);
         }
 
         #model-picker-wrap {
@@ -270,6 +285,7 @@
             <div id="model-picker"></div>
         </div>
         <button id="reset-btn" title="Clear placement">&#8635;</button>
+        <button id="mute-btn" title="Mute sound">&#128266;</button>
     </div>
 
     <div id="ar-hint"></div>
@@ -306,6 +322,7 @@
         var arCanvas = document.getElementById("ar-canvas");
         var backBtn = document.getElementById("back-btn");
         var resetBtn = document.getElementById("reset-btn");
+        var muteBtn = document.getElementById("mute-btn");
 
         var currentModel = MODELS[0];
 
@@ -342,6 +359,9 @@
         var camera = null;
         var reticle = null;
         var modelGroup = null;
+        var listener = null;
+        var thudAudio = null;
+        var muted = false;
         var gltfLoader = new GLTFLoader();
         var xrSession = null;
         var hitTestSource = null;
@@ -391,6 +411,8 @@
             modelGroup.visible = false;
             scene.add(modelGroup);
 
+            setupAudio();
+
             window.addEventListener("resize", function () {
                 if (!renderer) return;
                 camera.aspect = window.innerWidth / window.innerHeight;
@@ -399,13 +421,62 @@
             });
         }
 
+        // ── Distance-based positional audio (synthesized, no external files) ──
+        function createThudBuffer(context) {
+            var duration = 0.35;
+            var sampleRate = context.sampleRate;
+            var length = Math.floor(sampleRate * duration);
+            var buffer = context.createBuffer(1, length, sampleRate);
+            var data = buffer.getChannelData(0);
+            for (var i = 0; i < length; i++) {
+                var t = i / sampleRate;
+                var envelope = Math.exp(-t * 18);
+                var tone = Math.sin(2 * Math.PI * 100 * t) * envelope * 0.8;
+                var click = (Math.random() * 2 - 1) * Math.exp(-t * 90) * 0.5;
+                data[i] = Math.max(-1, Math.min(1, tone + click));
+            }
+            return buffer;
+        }
+
+        function setupAudio() {
+            listener = new THREE.AudioListener();
+            camera.add(listener);
+
+            thudAudio = new THREE.PositionalAudio(listener);
+            // Tuned for a pronounced near/far difference within room-scale distances:
+            // full volume within 0.4m, audibly quieter by a couple of metres, faint past ~6m.
+            thudAudio.setRefDistance(0.4);
+            thudAudio.setMaxDistance(10);
+            thudAudio.setRolloffFactor(3);
+            thudAudio.setDistanceModel("inverse");
+            thudAudio.setBuffer(createThudBuffer(listener.context));
+            thudAudio.setVolume(1);
+            modelGroup.add(thudAudio);
+        }
+
+        function playThud() {
+            if (!thudAudio) return;
+            if (thudAudio.isPlaying) thudAudio.stop();
+            thudAudio.play();
+        }
+
+        muteBtn.addEventListener("click", function () {
+            muted = !muted;
+            if (listener) listener.setMasterVolume(muted ? 0 : 1);
+            muteBtn.innerHTML = muted ? "&#128263;" : "&#128266;";
+            muteBtn.classList.toggle("muted", muted);
+        });
+
+        var currentMeshNode = null;
+
         function loadModelInto(assetPath) {
             gltfLoader.load(assetPath, function (gltf) {
                 if (!modelGroup) return;
-                while (modelGroup.children.length) {
-                    modelGroup.remove(modelGroup.children[0]);
+                if (currentMeshNode) {
+                    modelGroup.remove(currentMeshNode);
                 }
-                modelGroup.add(gltf.scene);
+                currentMeshNode = gltf.scene;
+                modelGroup.add(currentMeshNode);
             }, undefined, function (err) {
                 console.error("Failed to load model", assetPath, err);
             });
@@ -427,6 +498,7 @@
             modelGroup.scale.setScalar(currentScale);
             modelGroup.visible = true;
             setPlaced(true);
+            playThud();
         }
 
         resetBtn.addEventListener("click", function () {
@@ -539,6 +611,9 @@
 
         async function startAR() {
             if (!renderer) initThree();
+            if (listener && listener.context.state === "suspended") {
+                listener.context.resume();
+            }
 
             modelGroup.visible = false;
             reticle.visible = false;
