@@ -71,6 +71,10 @@
             display: flex;
         }
 
+        body.ar-active {
+            touch-action: none;
+        }
+
         /* ── Top bar ─────────────────────────────────────────────── */
         #topbar {
             position: fixed;
@@ -292,7 +296,7 @@
         ];
 
         var HINT_FIND_SURFACE = "&#128205; Move your phone to find a surface, then tap to place";
-        var HINT_MOVE = "&#128070; Tap elsewhere to move it";
+        var HINT_MOVE = "&#128070; Tap to move &middot; drag to rotate &middot; pinch to resize";
 
         var viewer = document.getElementById("viewer");
         var picker = document.getElementById("model-picker");
@@ -316,6 +320,8 @@
                     b.classList.remove("active");
                 });
                 btn.classList.add("active");
+                currentRotationY = 0;
+                currentScale = 1;
                 loadModelInto(model.assetPath);
             });
             picker.appendChild(btn);
@@ -341,6 +347,12 @@
         var hitTestSource = null;
         var hitTestSourceRequested = false;
         var placed = false;
+
+        var ROTATE_SPEED = 0.008;
+        var MIN_SCALE = 0.4;
+        var MAX_SCALE = 2.5;
+        var currentRotationY = 0;
+        var currentScale = 1;
 
         function setPlaced(value) {
             placed = value;
@@ -399,10 +411,20 @@
             });
         }
 
+        var _pos = new THREE.Vector3();
+        var _quat = new THREE.Quaternion();
+        var _scl = new THREE.Vector3();
+
         function onSelect() {
+            if (suppressNextSelect) {
+                suppressNextSelect = false;
+                return;
+            }
             if (!reticle.visible) return;
-            reticle.matrix.decompose(modelGroup.position, modelGroup.quaternion, modelGroup.scale);
-            modelGroup.scale.set(1, 1, 1);
+            reticle.matrix.decompose(_pos, _quat, _scl);
+            modelGroup.position.copy(_pos);
+            modelGroup.rotation.set(0, currentRotationY, 0);
+            modelGroup.scale.setScalar(currentScale);
             modelGroup.visible = true;
             setPlaced(true);
         }
@@ -410,8 +432,78 @@
         resetBtn.addEventListener("click", function () {
             if (!modelGroup) return;
             modelGroup.visible = false;
+            currentRotationY = 0;
+            currentScale = 1;
             setPlaced(false);
         });
+
+        // ── Touch gestures: one-finger drag = rotate, two-finger pinch = resize ──
+        var gestureMoved = false;
+        var suppressNextSelect = false;
+        var pinchStartDist = 0;
+        var pinchStartScale = 1;
+        var lastSingleX = 0;
+
+        function isUiTarget(target) {
+            return !!(target.closest && target.closest("#topbar, #start-ar-btn, #ar-unsupported"));
+        }
+
+        function touchDist(t0, t1) {
+            var dx = t0.clientX - t1.clientX;
+            var dy = t0.clientY - t1.clientY;
+            return Math.sqrt(dx * dx + dy * dy);
+        }
+
+        document.addEventListener("touchstart", function (e) {
+            if (!document.body.classList.contains("ar-active") || !placed) return;
+            if (isUiTarget(e.target)) return;
+            gestureMoved = false;
+            if (e.touches.length === 1) {
+                lastSingleX = e.touches[0].clientX;
+            } else if (e.touches.length === 2) {
+                pinchStartDist = touchDist(e.touches[0], e.touches[1]);
+                pinchStartScale = currentScale;
+            }
+        }, { passive: true });
+
+        document.addEventListener("touchmove", function (e) {
+            if (!document.body.classList.contains("ar-active") || !placed) return;
+            if (isUiTarget(e.target)) return;
+
+            if (e.touches.length === 1) {
+                var x = e.touches[0].clientX;
+                var dx = x - lastSingleX;
+                if (Math.abs(dx) > 1) {
+                    currentRotationY += dx * ROTATE_SPEED;
+                    modelGroup.rotation.y = currentRotationY;
+                    lastSingleX = x;
+                    gestureMoved = true;
+                    e.preventDefault();
+                }
+            } else if (e.touches.length === 2) {
+                var dist = touchDist(e.touches[0], e.touches[1]);
+                if (pinchStartDist > 0) {
+                    var scale = pinchStartScale * (dist / pinchStartDist);
+                    currentScale = Math.min(MAX_SCALE, Math.max(MIN_SCALE, scale));
+                    modelGroup.scale.setScalar(currentScale);
+                }
+                gestureMoved = true;
+                e.preventDefault();
+            }
+        }, { passive: false });
+
+        document.addEventListener("touchend", function (e) {
+            if (gestureMoved) suppressNextSelect = true;
+            if (e.touches.length === 0) {
+                gestureMoved = false;
+            } else if (e.touches.length === 1) {
+                lastSingleX = e.touches[0].clientX;
+            }
+        }, { passive: true });
+
+        document.addEventListener("touchcancel", function () {
+            gestureMoved = false;
+        }, { passive: true });
 
         function onXRFrame(timestamp, frame) {
             var session = frame.session;
@@ -450,6 +542,8 @@
 
             modelGroup.visible = false;
             reticle.visible = false;
+            currentRotationY = 0;
+            currentScale = 1;
             setPlaced(false);
             loadModelInto(currentModel.assetPath);
 
