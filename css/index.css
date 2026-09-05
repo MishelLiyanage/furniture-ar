@@ -275,26 +275,129 @@ body {
     margin: 0;
 }
 
-/* Model name badge (shown on target found) */
+/* Model name badge (shown on target found) — tappable to reveal price/details */
 #model-badge {
     position: absolute;
     top: 80px;
     left: 50%;
     z-index: 999;
     transform: translateX(-50%);
+    display: flex;
+    align-items: center;
+    gap: 8px;
     background: rgba(0, 0, 0, 0.65);
     backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
     color: #fff;
     font-size: 14px;
     font-weight: 600;
-    padding: 8px 18px;
+    padding: 8px 16px;
     border-radius: 24px;
     border: 1px solid rgba(255, 255, 255, 0.12);
     visibility: hidden;
     opacity: 0;
     transition: opacity 0.4s;
     white-space: nowrap;
+    cursor: pointer;
+}
+
+#model-badge .badge-price {
+    color: #56ccf2;
+    font-weight: 700;
+}
+
+#model-badge .badge-chevron {
+    font-size: 10px;
+    opacity: 0.6;
+    transition: transform 0.25s ease;
+}
+
+#model-badge.expanded .badge-chevron {
+    transform: rotate(180deg);
+}
+
+/* Details/price card — expands below the badge when tapped */
+#model-details {
+    position: absolute;
+    top: 122px;
+    left: 50%;
+    z-index: 998;
+    transform: translateX(-50%);
+    width: min(300px, 84vw);
+    background: rgba(0, 0, 0, 0.72);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    border-radius: 16px;
+    padding: 14px 16px;
+    color: #fff;
+    opacity: 0;
+    visibility: hidden;
+    max-height: 0;
+    overflow: hidden;
+    transition: opacity 0.25s ease;
     pointer-events: none;
+}
+
+#model-details.expanded {
+    opacity: 1;
+    visibility: visible;
+    max-height: 400px;
+    pointer-events: auto;
+}
+
+#model-details .detail-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    margin-bottom: 8px;
+}
+
+#model-details .detail-price {
+    color: #56ccf2;
+    font-size: 16px;
+    font-weight: 700;
+}
+
+#model-details .detail-rating,
+#model-details .detail-stock {
+    font-size: 11px;
+    color: rgba(255, 255, 255, 0.7);
+}
+
+#model-details .detail-stock.in-stock {
+    color: #6fcf97;
+}
+
+#model-details .detail-stock.out-stock {
+    color: #eb5757;
+}
+
+#model-details .detail-desc {
+    margin: 0 0 10px;
+    font-size: 12.5px;
+    line-height: 1.5;
+    color: rgba(255, 255, 255, 0.85);
+    font-weight: 400;
+}
+
+#model-details .detail-specs {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    font-size: 11.5px;
+    color: rgba(255, 255, 255, 0.65);
+    font-weight: 400;
+    border-top: 1px solid rgba(255, 255, 255, 0.1);
+    padding-top: 8px;
+}
+
+#model-details .detail-sku {
+    margin-top: 8px;
+    font-size: 10.5px;
+    color: rgba(255, 255, 255, 0.4);
+    font-weight: 400;
 }
 
 /* Bottom panel */

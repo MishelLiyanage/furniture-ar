@@ -6,21 +6,23 @@ Built for **INTE 42312 – Virtual and Augmented Reality** individual assignment
 
 ---
 
-## Features
+## Live Demo
 
-- **Marker-Based AR** — Scan a custom catalog image to anchor a rotating 3D furniture model, powered by MindAR's natural feature tracking.
-- **Markerless AR** — Detect real-world floor surfaces via WebXR hit-testing and place furniture models anywhere in your physical space.
-- **Drag-and-Drop Interaction** — Reposition placed furniture in real time by dragging it across the detected surface.
-- **Collision Detection** — Placed items detect overlap with one another and trigger a visual response.
-- **Two Furniture Categories** — Chair and table models, optimized for fast mobile loading.
-- **Lighting & Animation** — Ambient and directional lighting with idle rotation animation on marker-anchored models.
+- **Hosted App:** https://mishelliyanage.github.io/furniture-ar/
+- **Repository:** https://github.com/MishelLiyanage/furniture-ar
+- **Demo Video:** *(add link if available)*
 
 ---
 
-## Live Demo
+## Features
 
-- **Hosted App:** [add your Netlify/Vercel URL here]
-- **Demo Video:** [add your 3-minute demo link here]
+- **Marker-Based AR** — Scan a custom catalog image to anchor a rotating 3D furniture model, powered by MindAR's natural feature tracking, with on-screen size +/- controls.
+- **Markerless AR** — Detect real-world surfaces via the raw WebXR Device API hit-test and place furniture true-to-scale anywhere in your physical space, built directly on Three.js (no A-Frame or third-party hit-test component).
+- **Four-gesture manipulation (markerless mode)** — tap an open surface to relocate the placed item; drag directly on the furniture to reposition it in real time; drag on empty background to rotate it; pinch with two fingers to resize it within clamped bounds.
+- **Distance-based placement audio** — a placement "thud" is synthesized procedurally with the Web Audio API (no external sound files) and played through `THREE.PositionalAudio`, so it's audibly louder up close and quieter from across the room.
+- **Procedural contact shadow** — a soft radial-gradient shadow is generated on an in-memory canvas and sized/oriented per model from that GLTF's own bounding box, so it forms an oval matching each item's real footprint.
+- **Six furniture models** — chairs, a rocking chair, an adjustable desk, a coffee table, and a folding table, optimized for fast mobile loading.
+- **Lighting & animation** — ambient and directional lighting, with idle rotation animation on marker-anchored models.
 
 ---
 
@@ -28,11 +30,14 @@ Built for **INTE 42312 – Virtual and Augmented Reality** individual assignment
 
 | Component | Technology |
 |---|---|
-| Framework | A-Frame 1.5.0 |
-| Marker-Based Tracking | MindAR (image target tracking) |
-| Markerless Tracking | WebXR Device API (hit-test) |
-| 3D Models | glTF/.glb, optimized with gltf-transform |
-| Hosting | Netlify / Vercel |
+| Marker-based mode | A-Frame 1.5.0 + MindAR (`mindar-image-aframe`) |
+| Markerless mode | Three.js (r160, via CDN import map) + raw WebXR Device API hit-test |
+| Markerless gestures | Custom ES module (`js/drag-drop.js`), no third-party gesture library |
+| Audio | Web Audio API via `THREE.AudioListener` / `THREE.PositionalAudio` — procedurally synthesized, no audio assets |
+| 3D Models | glTF/.glb, optimized with `gltf-transform` |
+| Hosting | GitHub Pages (deployed from `main`) |
+
+> Note: marker mode and markerless mode are independent pipelines with no shared component layer — they were built separately to suit their very different tracking mechanisms (image-target anchoring vs. real-world plane detection).
 
 ---
 
@@ -40,22 +45,24 @@ Built for **INTE 42312 – Virtual and Augmented Reality** individual assignment
 
 ```
 furniture-ar/
-├── index.html              # Landing page — mode selector
-├── marker.html              # Marker-based AR scene (MindAR)
-├── markerless.html           # Markerless AR scene (WebXR hit-test + drag-drop)
+├── index.html                # Landing page + marker-based AR scene (A-Frame + MindAR)
+├── markerless.html            # Markerless AR page (markup only)
+├── css/
+│   ├── index.css               # Styles for index.html
+│   └── markerless.css           # Styles for markerless.html
+├── js/
+│   ├── markerless.js            # Core markerless AR: hit-test, placement, model loading, audio, shadow
+│   └── drag-drop.js             # Touch gestures: rotate, pinch-resize, grab-and-drag reposition
 ├── assets/
 │   ├── models/
-│   │   ├── chair1.glb
-│   │   ├── chair2.glb
-│   │   ├── chair3.glb
-│   │   ├── table1.glb
-│   │   ├── table2.glb
-│   │   └── table3.glb
+│   │   ├── chair_1.glb
+│   │   ├── rocking_chair.glb
+│   │   ├── chair_small.glb
+│   │   ├── adjustable_desk.glb
+│   │   ├── coffee_table.glb
+│   │   └── folding_table.glb
 │   └── markers/
-│       └── targets.mind      # Compiled MindAR image target
-├── js/
-│   ├── drag-drop.js          # Raycasting-based drag interaction
-│   └── collision.js          # Bounding-box collision detection
+│       └── targets.mind        # Compiled MindAR image target
 └── README.md
 ```
 
@@ -64,15 +71,16 @@ furniture-ar/
 ## Getting Started
 
 ### Prerequisites
-- Node.js and npm installed
-- A modern browser with camera access (Chrome on Android, Safari on iOS)
-- HTTPS hosting for mobile testing (camera access requires it)
+- A modern browser with camera access
+  - Marker-based mode: works on both Android Chrome and iOS Safari
+  - Markerless mode: requires **Android Chrome with ARCore** (WebXR `immersive-ar` hit-test is not supported on iOS Safari)
+- HTTPS hosting for mobile testing (camera and WebXR access both require a secure context)
 
 ### Local Setup
 
 1. Clone the repository:
    ```bash
-   git clone [your-repo-url]
+   git clone https://github.com/MishelLiyanage/furniture-ar.git
    cd furniture-ar
    ```
 
@@ -86,13 +94,15 @@ furniture-ar/
    live-server
    ```
 
-4. Open the local URL shown in your terminal (desktop testing works over HTTP; mobile testing requires HTTPS — see Deployment below).
+4. Open the local URL shown in your terminal (desktop testing works over HTTP for marker mode's inline preview; mobile testing of either AR mode requires HTTPS — see Deployment below).
 
 ### Deployment
 
-1. Push the project to a GitHub repository.
-2. Connect the repo to [Netlify](https://netlify.com) or [Vercel](https://vercel.com), or drag-and-drop the project folder onto [netlify.com/drop](https://app.netlify.com/drop).
-3. Open the generated HTTPS URL on a mobile device and grant camera permissions when prompted.
+The app is deployed on **GitHub Pages** from the `main` branch:
+
+1. Push/merge changes to `main`.
+2. In the repository, go to **Settings → Pages** and confirm the source is set to **Deploy from a branch → `main` → `/ (root)`**.
+3. Check the repository's **Actions** tab for the "pages build and deployment" run after each push — a red ❌ there (or a source misconfigured to "GitHub Actions" with no workflow file present) will silently prevent updates from appearing on the hosted URL even though the merge itself succeeded.
 
 ---
 
@@ -102,38 +112,48 @@ furniture-ar/
 1. From the landing page, tap **"Scan Catalog"**.
 2. Point your camera at the printed/displayed catalog marker image.
 3. A 3D furniture model appears anchored to the marker, rotating for a full view.
+4. Use the size +/- buttons or the model picker to adjust scale or switch furniture.
 
 ### Markerless Mode
 1. From the landing page, tap **"Place in My Room"**.
-2. Slowly move your phone to scan a flat surface (floor).
-3. Once a reticle appears, tap to place a furniture model at that spot.
-4. Drag placed items to reposition them; overlapping items trigger a collision indicator.
-5. Use **Reset** to clear the scene and start over.
+2. Tap **"View in your room"**, then slowly move your phone to scan a surface.
+3. Once the reticle appears, tap to place the furniture there.
+4. **Tap** elsewhere to relocate it, **drag directly on it** to reposition in real time, **drag empty background** to rotate it, or **pinch** to resize it.
+5. Use the **Reset** button (top-right, appears once placed) to clear the current item and start over.
 
 ---
 
 ## Known Technical Challenges
 
-*(Fill this in as you encounter and solve real issues during development — this section is required in the technical report and strengthens your Documentation & Troubleshooting marks.)*
-
-| Challenge | Solution |
-|---|---|
-| e.g., Model appeared invisible after MindAR integration | e.g., Adjusted scale from AR.js-appropriate values (0.3) down to MindAR's expected range (0.05) |
-| e.g., WebXR hit-test unsupported on iOS Safari | e.g., Documented as a known limitation; tested primarily on Chrome Android |
-| ... | ... |
+| Challenge | Root Cause | Solution |
+|---|---|---|
+| Camera passthrough rendered solid black in the custom WebXR view | `THREE.WebGLRenderer` clears to opaque black by default even with `alpha: true` on the context, blocking Chrome's alpha-blend AR compositing | Explicit `renderer.setClearColor(0x000000, 0)` |
+| Contact shadow appeared floating near the backrest instead of under the legs | Several downloaded GLTF assets have their pivot at the bounding-box centre, not the visual base — an inconsistency across third-party sources | Measure each mesh's own local bounding box before parenting it, and anchor the shadow to `box.min.y` and the box's horizontal centre instead of the model's raw origin |
+| Shadow shape/size still wrong after the position fix | The shadow plane's Z-axis scale was hardcoded instead of using the computed footprint, so only its width scaled correctly | Mapped the model's bounding-box width/depth to the plane's respective local axes independently |
+| Grab-and-drag reposition conflicted with the existing rotate gesture (both start as a one-finger drag) | No inherent way to know a touch's intent before it moves | Raycast at touch-start to classify the touch as "on the furniture" (reposition) vs. "on the background" (rotate); suppress the trailing tap-to-place event after any drag/pinch |
+| Placement sound didn't play reliably | Mobile browsers require a user gesture before starting a Web Audio `AudioContext` | Resume/create the context inside the "View in your room" button's own click handler |
+| WebXR hit-test unsupported on iOS Safari | The `immersive-ar` session type with hit-test is only reliably available on Android Chrome/ARCore | Documented as a known limitation; markerless mode falls back to a non-AR rotate-only preview with an "AR not available" message on unsupported devices |
 
 ---
 
 ## Assets & Credits
 
-- 3D Models: [source, e.g. Sketchfab / Poly Pizza — list each model and its license]
-- Marker Image: Custom-designed, compiled via MindAR image target compiler
-- Frameworks: [A-Frame](https://aframe.io/), [MindAR](https://hiukim.github.io/mind-ar-js-doc/)
+3D models sourced via [Poly Pizza](https://poly.pizza), openly licensed:
+
+- **Adjustable Desk** by Jeff Cobesign — CC-BY 3.0
+- **Folding Table** by S. Paul Michael — CC-BY 3.0
+- **Coffee Table** by Francisco Hui — CC-BY 3.0
+- **Chair** by Quaternius — Public Domain
+- **Rocking Chair** by CreativeTrio
+- **Chair (variant)** by Quaternius
+
+Marker image: custom-designed, compiled via the MindAR image target compiler.
+
+Frameworks/libraries: [A-Frame](https://aframe.io/), [MindAR](https://hiukim.github.io/mind-ar-js-doc/), [Three.js](https://threejs.org/), [model-viewer](https://modelviewer.dev/) (inline non-AR preview).
 
 ---
 
 ## Author
 
-[Your name]
-[Course / Module code: INTE 42312]
-[Submission date]
+Mishel
+Course / Module code: INTE 42312
