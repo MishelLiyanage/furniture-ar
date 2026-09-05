@@ -86,8 +86,13 @@
             <p>Point camera at the catalog marker</p>
         </div>
 
-        <!-- Model name badge -->
-        <div id="model-badge">Chair 1</div>
+        <!-- Model name badge — tap to reveal price/details -->
+        <button id="model-badge" type="button">
+            <span id="badge-name">Chair 1</span>
+            <span class="badge-price" id="badge-price"></span>
+            <span class="badge-chevron">&#9662;</span>
+        </button>
+        <div id="model-details"></div>
 
         <!-- Bottom panel: size controls + model picker -->
         <div id="bottom-panel">
@@ -107,12 +112,72 @@
         // Models vary in source units (some already in meters, some not), so these are per-model tuned starting points.
         // Using the direct file path (not "#asset-id") because A-Frame's "#id" resolution is unreliable across repeated runtime updates.
         var MODELS = [
-            { key: "chair_1", label: "Chair 1", assetPath: "assets/models/chair_1.glb", baseScale: 0.35 },
-            { key: "rocking_chair", label: "Rocking Chair", assetPath: "assets/models/rocking_chair.glb", baseScale: 0.4 },
-            { key: "chair_small", label: "Chair (Small)", assetPath: "assets/models/chair_small.glb", baseScale: 0.35 },
-            { key: "adjustable_desk", label: "Adj. Desk", assetPath: "assets/models/adjustable_desk.glb", baseScale: 0.6 },
-            { key: "coffee_table", label: "Coffee Table", assetPath: "assets/models/coffee_table.glb", baseScale: 0.6 },
-            { key: "folding_table", label: "Folding Table", assetPath: "assets/models/folding_table.glb", baseScale: 0.35 }
+            {
+                key: "chair_1", label: "Chair 1", assetPath: "assets/models/chair_1.glb", baseScale: 0.35,
+                details: {
+                    name: "Classic Armchair", category: "Chairs", price: 149.99, currency: "LKR",
+                    description: "A traditional wooden-frame armchair with a bold mustard-yellow upholstered body, contrasting red backrest panel, and tan seat cushion.",
+                    dimensions: { width: 70, height: 95, depth: 75, unit: "cm" },
+                    material: "Solid wood frame, fabric upholstery",
+                    color: "Mustard Yellow / Red / Tan",
+                    weight: "10 kg", inStock: true, rating: 4.6, sku: "CH-ARM-001"
+                }
+            },
+            {
+                key: "rocking_chair", label: "Rocking Chair", assetPath: "assets/models/rocking_chair.glb", baseScale: 0.4,
+                details: {
+                    name: "Wooden Rocking Chair", category: "Chairs", price: 179.99, currency: "LKR",
+                    description: "A classic Mission-style wooden rocking chair with slatted backrest, curved armrests, and a padded cream cushion seat.",
+                    dimensions: { width: 68, height: 110, depth: 90, unit: "cm" },
+                    material: "Solid oak wood, fabric cushion",
+                    color: "Dark Walnut / Cream",
+                    weight: "13 kg", inStock: true, rating: 4.7, sku: "CH-ROC-002"
+                }
+            },
+            {
+                key: "chair_small", label: "Chair (Small)", assetPath: "assets/models/chair_small.glb", baseScale: 0.35,
+                details: {
+                    name: "Bistro Side Chair", category: "Chairs", price: 64.99, currency: "LKR",
+                    description: "A compact bronze-toned bistro chair with a curved ladder back and octagonal seat, ideal for small dining spaces.",
+                    dimensions: { width: 45, height: 88, depth: 48, unit: "cm" },
+                    material: "Powder-coated metal",
+                    color: "Antique Bronze",
+                    weight: "5 kg", inStock: true, rating: 4.3, sku: "CH-BST-003"
+                }
+            },
+            {
+                key: "adjustable_desk", label: "Adj. Desk", assetPath: "assets/models/adjustable_desk.glb", baseScale: 0.6,
+                details: {
+                    name: "Adjustable Standing Desk", category: "Desks", price: 349.99, currency: "LKR",
+                    description: "An electric height-adjustable desk with a corner-cut work surface and dual-motor lift columns, suited for home office setups.",
+                    dimensions: { width: 160, height: 120, depth: 80, unit: "cm" },
+                    material: "Engineered wood top, steel frame",
+                    color: "Matte Black",
+                    weight: "35 kg", inStock: true, rating: 4.8, sku: "DK-ADJ-001"
+                }
+            },
+            {
+                key: "coffee_table", label: "Coffee Table", assetPath: "assets/models/coffee_table.glb", baseScale: 0.6,
+                details: {
+                    name: "Modular Coffee Table Set", category: "Tables", price: 219.99, currency: "LKR",
+                    description: "A two-piece glass-top coffee table set with a matte black metal frame and open lower shelf, designed to be arranged together or separately.",
+                    dimensions: { width: 120, height: 40, depth: 60, unit: "cm" },
+                    material: "Tempered glass, powder-coated steel",
+                    color: "Matte Black",
+                    weight: "18 kg", inStock: true, rating: 4.5, sku: "TB-COF-001"
+                }
+            },
+            {
+                key: "folding_table", label: "Folding Table", assetPath: "assets/models/folding_table.glb", baseScale: 0.35,
+                details: {
+                    name: "Folding Utility Table", category: "Tables", price: 54.99, currency: "LKR",
+                    description: "A lightweight white folding table with collapsible metal legs, ideal for events, temporary workspaces, or storage-friendly setups.",
+                    dimensions: { width: 180, height: 74, depth: 75, unit: "cm" },
+                    material: "Plastic top, steel folding legs",
+                    color: "White",
+                    weight: "9 kg", inStock: true, rating: 4.1, sku: "TB-FLD-002"
+                }
+            }
         ];
 
         document.addEventListener("DOMContentLoaded", function () {
@@ -120,6 +185,9 @@
             var arView = document.getElementById("ar-view");
             var scanHint = document.getElementById("scan-hint");
             var badge = document.getElementById("model-badge");
+            var badgeName = document.getElementById("badge-name");
+            var badgePrice = document.getElementById("badge-price");
+            var details = document.getElementById("model-details");
             var picker = document.getElementById("model-picker");
             var modelEntity = document.getElementById("furniture-model");
             var arTarget = document.getElementById("ar-target");
@@ -143,6 +211,7 @@
             document.getElementById("back-btn").addEventListener("click", function () {
                 arView.classList.remove("active");
                 landing.style.display = "flex";
+                collapseDetails();
             });
 
             // ── Marker tracking: show/hide scan hint and badge ───────────
@@ -155,6 +224,7 @@
                 scanHint.classList.remove("hidden");
                 badge.style.visibility = "hidden";
                 badge.style.opacity = "0";
+                collapseDetails();
             });
 
             // ── Scale helpers ────────────────────────────────────────────
@@ -163,13 +233,46 @@
                 modelEntity.setAttribute("scale", s + " " + s + " " + s);
             }
 
+            // ── Details/price card ────────────────────────────────────────
+            function formatDetails(d) {
+                var stockClass = d.inStock ? "in-stock" : "out-stock";
+                var stockLabel = d.inStock ? "In Stock" : "Out of Stock";
+                return (
+                    '<div class="detail-row">' +
+                    '<span class="detail-price">' + d.currency + " " + d.price.toFixed(2) + "</span>" +
+                    '<span class="detail-rating">&#9733; ' + d.rating.toFixed(1) + "</span>" +
+                    '<span class="detail-stock ' + stockClass + '">' + stockLabel + "</span>" +
+                    "</div>" +
+                    '<p class="detail-desc">' + d.description + "</p>" +
+                    '<div class="detail-specs">' +
+                    "<span>" + d.dimensions.width + "&times;" + d.dimensions.height + "&times;" + d.dimensions.depth + " " + d.dimensions.unit + "</span>" +
+                    "<span>" + d.material + "</span>" +
+                    "<span>" + d.color + "</span>" +
+                    "</div>" +
+                    '<div class="detail-sku">SKU: ' + d.sku + "</div>"
+                );
+            }
+
+            function collapseDetails() {
+                badge.classList.remove("expanded");
+                details.classList.remove("expanded");
+            }
+
+            badge.addEventListener("click", function () {
+                badge.classList.toggle("expanded");
+                details.classList.toggle("expanded");
+            });
+
             // ── Model switching ──────────────────────────────────────────
             function selectModel(model, button) {
                 currentModel = model;
                 sizeMultiplier = 1;
                 modelEntity.setAttribute("gltf-model", model.assetPath);
                 applyScale();
-                badge.textContent = model.label;
+                badgeName.textContent = model.label;
+                badgePrice.textContent = model.details.currency + " " + model.details.price.toFixed(2);
+                details.innerHTML = formatDetails(model.details);
+                collapseDetails();
                 Array.prototype.forEach.call(picker.children, function (btn) {
                     btn.classList.remove("active");
                 });
