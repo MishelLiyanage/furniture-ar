@@ -1,0 +1,275 @@
+*,
+*::before,
+*::after {
+    box-sizing: border-box;
+    -webkit-tap-highlight-color: transparent;
+}
+
+html,
+body {
+    margin: 0;
+    padding: 0;
+    width: 100%;
+    height: 100%;
+    overflow: hidden;
+    font-family: 'Segoe UI', system-ui, sans-serif;
+    background: #0f0f0f;
+}
+
+#viewer,
+#ar-canvas {
+    position: fixed;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    --poster-color: #0f0f0f;
+    transition: opacity .3s ease;
+}
+
+#ar-canvas {
+    background: transparent;
+    opacity: 0;
+    pointer-events: none;
+}
+
+body.ar-active #ar-canvas {
+    opacity: 1;
+    pointer-events: auto;
+}
+
+body.ar-active #viewer {
+    opacity: 0;
+    pointer-events: none;
+}
+
+body.ar-active #start-ar-btn {
+    display: none;
+}
+
+body.ar-active #ar-hint {
+    display: flex;
+}
+
+body.ar-active.placed #reset-btn {
+    display: flex;
+}
+
+body.ar-active {
+    touch-action: none;
+}
+
+/* ── Top bar ─────────────────────────────────────────────── */
+#topbar {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    z-index: 999;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    padding: calc(env(safe-area-inset-top, 0px) + 14px) 14px 24px;
+    background: linear-gradient(to bottom, rgba(0, 0, 0, 0.65), rgba(0, 0, 0, 0));
+    pointer-events: none;
+}
+
+#topbar>* {
+    pointer-events: auto;
+}
+
+#topbar-right {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+#back-btn,
+#reset-btn,
+#mute-btn {
+    flex: 0 0 auto;
+    width: 38px;
+    height: 38px;
+    border-radius: 50%;
+    border: none;
+    background: rgba(20, 20, 20, 0.65);
+    backdrop-filter: blur(6px);
+    -webkit-backdrop-filter: blur(6px);
+    color: #fff;
+    font-size: 17px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.35);
+    transition: transform .15s ease, background .15s ease;
+}
+
+#back-btn:active,
+#reset-btn:active,
+#mute-btn:active {
+    transform: scale(0.92);
+    background: rgba(20, 20, 20, 0.85);
+}
+
+#reset-btn {
+    display: none;
+}
+
+#mute-btn {
+    display: none;
+    font-size: 15px;
+}
+
+body.ar-active #mute-btn {
+    display: flex;
+}
+
+#mute-btn.muted {
+    background: rgba(220, 60, 60, 0.55);
+}
+
+#model-picker-wrap {
+    width: 100%;
+    min-width: 0;
+    overflow-x: auto;
+    overflow-y: hidden;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+    mask-image: linear-gradient(to right, transparent, black 16px, black calc(100% - 16px), transparent);
+    -webkit-mask-image: linear-gradient(to right, transparent, black 16px, black calc(100% - 16px), transparent);
+}
+
+#model-picker-wrap::-webkit-scrollbar {
+    display: none;
+}
+
+#model-picker {
+    display: flex;
+    gap: 8px;
+    width: max-content;
+    padding: 2px 16px;
+}
+
+#model-picker button {
+    flex: 0 0 auto;
+    font-size: 12.5px;
+    font-weight: 500;
+    padding: 9px 15px;
+    border: 1.5px solid rgba(255, 255, 255, 0.2);
+    border-radius: 20px;
+    background: rgba(20, 20, 20, 0.6);
+    backdrop-filter: blur(6px);
+    -webkit-backdrop-filter: blur(6px);
+    color: #eee;
+    cursor: pointer;
+    white-space: nowrap;
+    transition: background .15s ease, border-color .15s ease, transform .15s ease;
+}
+
+#model-picker button:active {
+    transform: scale(0.95);
+}
+
+#model-picker button.active {
+    background: #2e86de;
+    border-color: #2e86de;
+    color: #fff;
+    font-weight: 600;
+}
+
+/* ── AR hint pill ────────────────────────────────────────── */
+#ar-hint {
+    position: fixed;
+    top: calc(env(safe-area-inset-top, 0px) + 66px);
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 998;
+    display: none;
+    align-items: center;
+    gap: 7px;
+    color: #fff;
+    background: rgba(20, 20, 20, 0.65);
+    backdrop-filter: blur(6px);
+    -webkit-backdrop-filter: blur(6px);
+    padding: 9px 18px;
+    border-radius: 18px;
+    font-size: 13px;
+    text-align: center;
+    max-width: 85vw;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.3);
+}
+
+/* ── Bottom panel: model picker + primary action, mirrors the marker-based UI ── */
+#bottom-panel {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    z-index: 999;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 12px;
+    padding: 16px 14px max(28px, calc(env(safe-area-inset-bottom, 0px) + 20px));
+    background: linear-gradient(to top, rgba(0, 0, 0, 0.7) 0%, transparent 100%);
+    pointer-events: none;
+}
+
+#bottom-panel>* {
+    pointer-events: auto;
+}
+
+#start-ar-btn {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 14px 26px 14px 18px;
+    border: none;
+    border-radius: 26px;
+    background: #2e86de;
+    color: #fff;
+    font-size: 15px;
+    font-weight: 600;
+    cursor: pointer;
+    box-shadow: 0 8px 26px rgba(46, 134, 222, 0.5);
+    transition: transform .15s ease, box-shadow .15s ease, opacity .2s ease;
+}
+
+#start-ar-btn:active {
+    transform: scale(0.96);
+}
+
+#start-ar-btn:disabled {
+    opacity: 0.45;
+    cursor: default;
+    box-shadow: none;
+}
+
+#start-ar-btn .badge {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 26px;
+    height: 20px;
+    border-radius: 6px;
+    background: rgba(255, 255, 255, 0.22);
+    font-size: 10.5px;
+    font-weight: 700;
+    letter-spacing: 0.3px;
+}
+
+#ar-unsupported {
+    color: #fff;
+    background: rgba(20, 20, 20, 0.7);
+    backdrop-filter: blur(6px);
+    -webkit-backdrop-filter: blur(6px);
+    padding: 11px 20px;
+    border-radius: 20px;
+    font-size: 13px;
+    display: none;
+    max-width: 80vw;
+    text-align: center;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.3);
+}
