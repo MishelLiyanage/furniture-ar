@@ -359,6 +359,7 @@
         var camera = null;
         var reticle = null;
         var modelGroup = null;
+        var shadowBlob = null;
         var listener = null;
         var thudAudio = null;
         var muted = false;
@@ -411,6 +412,14 @@
             modelGroup.visible = false;
             scene.add(modelGroup);
 
+            shadowBlob = new THREE.Mesh(
+                new THREE.CircleGeometry(1, 32).rotateX(-Math.PI / 2),
+                new THREE.MeshBasicMaterial({ map: createBlobTexture(), transparent: true, depthWrite: false })
+            );
+            shadowBlob.position.y = 0.002;
+            shadowBlob.renderOrder = -1;
+            modelGroup.add(shadowBlob);
+
             setupAudio();
 
             window.addEventListener("resize", function () {
@@ -419,6 +428,21 @@
                 camera.updateProjectionMatrix();
                 renderer.setSize(window.innerWidth, window.innerHeight);
             });
+        }
+
+        // ── Fake contact shadow (soft radial blob under the furniture) ──
+        function createBlobTexture() {
+            var size = 128;
+            var canvas = document.createElement("canvas");
+            canvas.width = canvas.height = size;
+            var ctx = canvas.getContext("2d");
+            var gradient = ctx.createRadialGradient(size / 2, size / 2, 0, size / 2, size / 2, size / 2);
+            gradient.addColorStop(0, "rgba(0,0,0,0.7)");
+            gradient.addColorStop(0.6, "rgba(0,0,0,0.4)");
+            gradient.addColorStop(1, "rgba(0,0,0,0)");
+            ctx.fillStyle = gradient;
+            ctx.fillRect(0, 0, size, size);
+            return new THREE.CanvasTexture(canvas);
         }
 
         // ── Distance-based positional audio (synthesized, no external files) ──
@@ -472,11 +496,32 @@
         function loadModelInto(assetPath) {
             gltfLoader.load(assetPath, function (gltf) {
                 if (!modelGroup) return;
+
+                // Measure the mesh's own bounding box BEFORE parenting it, while it still
+                // has an identity transform — otherwise this would return world-space
+                // bounds distorted by modelGroup's current position/rotation/scale.
+                var box = new THREE.Box3().setFromObject(gltf.scene);
+                var size = box.getSize(new THREE.Vector3());
+                var center = box.getCenter(new THREE.Vector3());
+                // The blob geometry is a unit circle rotated flat: its own X maps to world X,
+                // and its own Y (pre-rotation) maps to world Z — so X/Z need separate scale
+                // factors to make an oval that matches the furniture's actual footprint shape
+                // and orientation, rather than a uniform circle.
+                var footprintX = Math.max(0.28, Math.min(size.x * 0.9, 1.4));
+                var footprintZ = Math.max(0.28, Math.min(size.z * 0.9, 1.4));
+
                 if (currentMeshNode) {
                     modelGroup.remove(currentMeshNode);
                 }
                 currentMeshNode = gltf.scene;
                 modelGroup.add(currentMeshNode);
+
+                // Many downloaded GLTF assets have their pivot at the bounding-box centre
+                // rather than at the object's visual base, which is why the shadow used to
+                // float up near seat/backrest height instead of sitting under the legs.
+                // Anchor it to the mesh's true footprint centre and lowest point instead.
+                shadowBlob.position.set(center.x, box.min.y + 0.006, center.z);
+                shadowBlob.scale.set(footprintX, 1, footprintZ);
             }, undefined, function (err) {
                 console.error("Failed to load model", assetPath, err);
             });
